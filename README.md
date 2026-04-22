@@ -12,7 +12,7 @@
 
 在云托管中新建服务，**构建目录**选本目录（仅含本 Dockerfile 即可，无需拷贝整个 monorepo 时可将本目录单独上传/子模块）；或与主仓库同源时**构建子目录**指定为 `iopaint-service`（以控制台是否支持「子目录 Docker」为准；不支持则只上传本目录）。
 
-Dockerfile 使用 **`pytorch/pytorch` CPU 底包**，避免在构建阶段用 `python:3.11-slim` 再从 PyPI 装完整 `torch`（该步骤易触发**构建超时**）。底镜像首拉较大，但层可缓存；若云托管仍超时，可本机/CI 执行 `docker build` 后**推 TCR/CCR，线上选「已有镜像」部署**。
+Dockerfile 使用 `python:3.11-slim`，并通过 **PyTorch 官方 CPU wheel 源**（`download.pytorch.org/whl/cpu`）安装 `torch`，再 `pip install iopaint`（勿使用 Docker Hub 上不存在的 `pytorch/pytorch:x.y.z-cpu` 标签）。若云托管**构建仍超时**，请调大构建时限/资源，或本机 `docker build` 后**推 TCR/CCR** 用现成镜像部署。
 
 ## 健康检查
 
