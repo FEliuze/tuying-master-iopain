@@ -33,28 +33,17 @@
 # # 探活可用: GET /api/v1/server-config
 # CMD ["/bin/sh", "-c", "exec iopaint start --host=0.0.0.0 --port=\"${PORT:-80}\" --model=\"${IOPAINT_MODEL:-lama}\" --device=\"${IOPAINT_DEVICE:-cpu}\" --enable-realesrgan --realesrgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-gfpgan --gfpgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-restoreformer --restoreformer-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-remove-bg --remove-bg-device=\"${IOPAINT_DEVICE:-cpu}\" --no-half"]
 
-# 使用社区预构建的 IOPaint 基础镜像（CPU 版本，适合云托管环境）
-# 该镜像已包含 iopaint 及所有依赖，无需本地构建
-FROM cwq1913/lama-cleaner:cpu-latest
-
-# 使用社区预构建镜像的指定版本（请确认 Docker Hub 上的实际版本号）
+# 使用社区预构建的 IOPaint 基础镜像（CPU 版本）
 FROM cwq1913/lama-cleaner:cpu-0.26.1
 
-# 保留你原有的环境变量配置
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    DEBIAN_FRONTEND=noninteractive \
-    PORT=80 \
+# 设置容器内的环境变量
+ENV PORT=80 \
     IOPAINT_MODEL=lama \
     IOPAINT_DEVICE=cpu
 
-# 预构建镜像已包含依赖，无需重复安装
-# 仅保留健康检查需要的工具（可选）
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
+# 云托管要求暴露 80 端口
 EXPOSE 80
 
-# 启动命令（使用 lama-cleaner，不是 iopaint）
+# 直接启动服务，保留你之前的所有插件参数
+# 注意：基础镜像的可执行文件是 lama-cleaner
 CMD ["/bin/sh", "-c", "exec lama-cleaner --host=0.0.0.0 --port=\"${PORT:-80}\" --model=\"${IOPAINT_MODEL:-lama}\" --device=\"${IOPAINT_DEVICE:-cpu}\" --enable-realesrgan --realesrgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-gfpgan --gfpgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-restoreformer --restoreformer-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-remove-bg --remove-bg-device=\"${IOPAINT_DEVICE:-cpu}\" --no-half"]
