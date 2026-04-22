@@ -33,29 +33,17 @@
 # # 探活可用: GET /api/v1/server-config
 # CMD ["/bin/sh", "-c", "exec iopaint start --host=0.0.0.0 --port=\"${PORT:-80}\" --model=\"${IOPAINT_MODEL:-lama}\" --device=\"${IOPAINT_DEVICE:-cpu}\" --enable-realesrgan --realesrgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-gfpgan --gfpgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-restoreformer --restoreformer-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-remove-bg --remove-bg-device=\"${IOPAINT_DEVICE:-cpu}\" --no-half"]
 
-# 使用仍在维护期的 Debian 11 (Bullseye) 作为基础镜像，可避免软件源失效的问题
-FROM python:3.11-slim-bullseye
+# 使用社区预构建的 IOPaint 基础镜像（CPU 版本）
+FROM cwq1913/lama-cleaner:cpu-0.26.1
 
-# 设置环境变量，防止Python生成pyc文件并在输出中缓冲日志
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PORT=80 \
+# 设置容器内的环境变量
+ENV PORT=80 \
     IOPAINT_MODEL=lama \
     IOPAINT_DEVICE=cpu
 
-# 设置 pip 使用国内镜像源，加速依赖下载
-RUN pip config set global.index-url https://mirrors.cloud.tencent.com/pypi/simple
-
-# 安装 IOPaint 运行所需的系统库和 IOPaint 本身
-# 这里将两个 RUN 命令合并，可以减少最终镜像的层数
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip install --no-cache-dir iopaint
-
-# 暴露服务端口
+# 云托管要求暴露 80 端口
 EXPOSE 80
 
-# 使用 iopaint 命令启动服务，保留你需要的所有插件
-CMD ["/bin/sh", "-c", "exec iopaint start --host=0.0.0.0 --port=\"${PORT:-80}\" --model=\"${IOPAINT_MODEL:-lama}\" --device=\"${IOPAINT_DEVICE:-cpu}\" --enable-realesrgan --realesrgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-gfpgan --gfpgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-restoreformer --restoreformer-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-remove-bg --remove-bg-device=\"${IOPAINT_DEVICE:-cpu}\" --no-half"]
+# 直接启动服务，保留你之前的所有插件参数
+# 注意：基础镜像的可执行文件是 lama-cleaner
+CMD ["/bin/sh", "-c", "exec lama-cleaner --host=0.0.0.0 --port=\"${PORT:-80}\" --model=\"${IOPAINT_MODEL:-lama}\" --device=\"${IOPAINT_DEVICE:-cpu}\" --enable-realesrgan --realesrgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-gfpgan --gfpgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-restoreformer --restoreformer-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-remove-bg --remove-bg-device=\"${IOPAINT_DEVICE:-cpu}\" --no-half"]
