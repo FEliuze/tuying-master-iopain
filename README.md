@@ -16,6 +16,12 @@
 
 `GET /api/v1/server-config` 返回 200 即就绪。首次拉模型可能较久，探活需适当超时。
 
+## 部署排错：tuying-tools 探活 `HTTP 404`（/api/v1/server-config）
+
+说明对方进程**不是** IOPaint 1.3+ 的 HTTP API。常见原因：曾用仅含旧命令 `lama-cleaner` 的社区镜像，其路由与 `tools` 中 `iopaint>=1.3` 的 `/api/v1/*` 不兼容。请**按本目录当前 Dockerfile 重建**（`iopaint start`），并确保 `IOPAINT_BASE_URL` 指向该服务，而非其他 Flask/静态站点。
+
+本镜像基于 `pip install iopaint`，**首次构建**会拉取 PyTorch 等依赖，云托管构建时间可能较长，请在控制台**适当调大构建超时/资源**。
+
 ## 部署排错：Readiness `connection refused :80`
 
 云托管会向容器注入 `PORT`（多为 **8080**）。若服务仍按模板使用**服务端口 80** 做探活，而进程按 `PORT` 监听 **8080**，会出现 `dial tcp ...:80: connection refused`。请在控制台将**容器/服务端口**改为与 `PORT` 一致（默认 **8080**），或与运维确认环境变量中的 `PORT` 值。
