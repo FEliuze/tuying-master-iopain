@@ -1,25 +1,27 @@
 # IOPaint HTTP（REST `/api/v1/*`），供 tuying-tools 通过 IOPAINT_BASE_URL 调用。
 #
-# 勿使用仅启动旧版 `lama-cleaner` 可执行文件的镜像：该服务无 `/api/v1/server-config`，
-# tools 探活会 HTTP 404。必须用 PyPI 包 iopaint>=1.3 的 `iopaint start`。
-# 与 tools/ 分离构建，避免主 tools 镜像内装 iopaint+torch。
+# 勿用仅 `lama-cleaner` 的旧镜像（无 /api/v1，tools 会 HTTP 404）。须 `iopaint start`（iopaint>=1.3）。
+#
+# 构建优化：用预装 PyTorch CPU 的官方底包，避免在 `pip install iopaint` 时再从 PyPI 拉完整 torch
+#（云托管上该步骤极易触发构建超时）。底镜像较胖但层可缓存；真正耗时的是大 wheel 的重复下载。
 
-FROM python:3.11-slim-bookworm
+FROM pytorch/pytorch:2.1.0-cpu
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    PIP_PREFER_BINARY=1
 
+# 底镜像为科研栈，补 IOPaint / OpenCV 链常见系统库
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
-    curl \
     libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 与 tools 中 iopaint 的 Pillow 版本一致
+# 与 tools 中 iopaint 的 Pillow 版本一致；腾讯云 PyPI 镜像
 RUN pip config set global.index-url https://mirrors.cloud.tencent.com/pypi/simple \
     && pip config set global.trusted-host mirrors.cloud.tencent.com \
     && pip install --upgrade pip \

@@ -12,6 +12,8 @@
 
 在云托管中新建服务，**构建目录**选本目录（仅含本 Dockerfile 即可，无需拷贝整个 monorepo 时可将本目录单独上传/子模块）；或与主仓库同源时**构建子目录**指定为 `iopaint-service`（以控制台是否支持「子目录 Docker」为准；不支持则只上传本目录）。
 
+Dockerfile 使用 **`pytorch/pytorch` CPU 底包**，避免在构建阶段用 `python:3.11-slim` 再从 PyPI 装完整 `torch`（该步骤易触发**构建超时**）。底镜像首拉较大，但层可缓存；若云托管仍超时，可本机/CI 执行 `docker build` 后**推 TCR/CCR，线上选「已有镜像」部署**。
+
 ## 健康检查
 
 `GET /api/v1/server-config` 返回 200 即就绪。首次拉模型可能较久，探活需适当超时。
@@ -20,7 +22,7 @@
 
 说明对方进程**不是** IOPaint 1.3+ 的 HTTP API。常见原因：曾用仅含旧命令 `lama-cleaner` 的社区镜像，其路由与 `tools` 中 `iopaint>=1.3` 的 `/api/v1/*` 不兼容。请**按本目录当前 Dockerfile 重建**（`iopaint start`），并确保 `IOPAINT_BASE_URL` 指向该服务，而非其他 Flask/静态站点。
 
-本镜像基于 `pip install iopaint`，**首次构建**会拉取 PyTorch 等依赖，云托管构建时间可能较长，请在控制台**适当调大构建超时/资源**。
+本镜像在预装 PyTorch 的底包上 `pip install iopaint`；与「纯 slim + 全量 pip 装 torch」相比，**构建阶段**明显更短。若 pip 因版本约束仍升级 torch，可在控制台**调大构建超时**，或改成本地打镜像后推送。
 
 ## 部署排错：Readiness `connection refused :80`
 
