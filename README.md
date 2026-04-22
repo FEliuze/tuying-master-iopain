@@ -16,6 +16,10 @@
 
 `GET /api/v1/server-config` 返回 200 即就绪。首次拉模型可能较久，探活需适当超时。
 
+## 部署排错：Readiness `connection refused :80`
+
+云托管会向容器注入 `PORT`（多为 **8080**）。若服务仍按模板使用**服务端口 80** 做探活，而进程按 `PORT` 监听 **8080**，会出现 `dial tcp ...:80: connection refused`。请在控制台将**容器/服务端口**改为与 `PORT` 一致（默认 **8080**），或与运维确认环境变量中的 `PORT` 值。
+
 ## 资源
 
 建议 CPU/内存配足；GPU 时可将 `IOPAINT_DEVICE` 等改为 `cuda`（需平台支持并自行评估镜像）。

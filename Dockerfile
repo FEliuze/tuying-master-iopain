@@ -23,27 +23,27 @@
 #     && pip install --upgrade pip \
 #     && pip install --no-cache-dir "Pillow==9.5.0" "iopaint>=1.3.0,<2"
 
-# # 云托管常注入 PORT=80 或 8080；需对外监听 0.0.0.0
-# EXPOSE 80
+# # 云托管常注入 PORT=8080；需对外监听 0.0.0.0，且与控制台服务端口一致
+# EXPOSE 8080
 
-# ENV PORT=80 \
+# ENV PORT=8080 \
 #     IOPAINT_MODEL=lama \
 #     IOPAINT_DEVICE=cpu
 
 # # 探活可用: GET /api/v1/server-config
-# CMD ["/bin/sh", "-c", "exec iopaint start --host=0.0.0.0 --port=\"${PORT:-80}\" --model=\"${IOPAINT_MODEL:-lama}\" --device=\"${IOPAINT_DEVICE:-cpu}\" --enable-realesrgan --realesrgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-gfpgan --gfpgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-restoreformer --restoreformer-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-remove-bg --remove-bg-device=\"${IOPAINT_DEVICE:-cpu}\" --no-half"]
+# CMD ["/bin/sh", "-c", "exec iopaint start --host=0.0.0.0 --port=\"${PORT:-8080}\" --model=\"${IOPAINT_MODEL:-lama}\" --device=\"${IOPAINT_DEVICE:-cpu}\" --enable-realesrgan --realesrgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-gfpgan --gfpgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-restoreformer --restoreformer-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-remove-bg --remove-bg-device=\"${IOPAINT_DEVICE:-cpu}\" --no-half"]
 
 # 使用社区预构建的 IOPaint 基础镜像（CPU 版本）
 FROM cwq1913/lama-cleaner:cpu-0.26.1
 
-# 设置容器内的环境变量
-ENV PORT=80 \
+# 默认 8080：与微信云托管/K8s 常注入的 PORT=8080 一致；控制台「服务端口」须与此相同。
+# 若写死 80 而平台注入 PORT=8080，进程会监听 8080、探活仍打 80，则 Readiness 报 connection refused。
+ENV PORT=8080 \
     IOPAINT_MODEL=lama \
     IOPAINT_DEVICE=cpu
 
-# 云托管要求暴露 80 端口
-EXPOSE 80
+EXPOSE 8080
 
 # 直接启动服务，保留你之前的所有插件参数
 # 注意：基础镜像的可执行文件是 lama-cleaner
-CMD ["/bin/sh", "-c", "exec lama-cleaner --host=0.0.0.0 --port=\"${PORT:-80}\" --model=\"${IOPAINT_MODEL:-lama}\" --device=\"${IOPAINT_DEVICE:-cpu}\" --enable-realesrgan --realesrgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-gfpgan --gfpgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-restoreformer --restoreformer-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-remove-bg --remove-bg-device=\"${IOPAINT_DEVICE:-cpu}\" --no-half"]
+CMD ["/bin/sh", "-c", "exec lama-cleaner --host=0.0.0.0 --port=\"${PORT:-8080}\" --model=\"${IOPAINT_MODEL:-lama}\" --device=\"${IOPAINT_DEVICE:-cpu}\" --enable-realesrgan --realesrgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-gfpgan --gfpgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-restoreformer --restoreformer-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-remove-bg --remove-bg-device=\"${IOPAINT_DEVICE:-cpu}\" --no-half"]
