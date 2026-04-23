@@ -12,7 +12,7 @@
 
 在云托管中新建服务，**构建目录**选本目录（仅含本 Dockerfile 即可，无需拷贝整个 monorepo 时可将本目录单独上传/子模块）；或与主仓库同源时**构建子目录**指定为 `iopaint-service`（以控制台是否支持「子目录 Docker」为准；不支持则只上传本目录）。
 
-Dockerfile 使用 `python:3.11-slim`，从本目录 **`iopaint-offline.tar.gz`** 解压后安装（由 `scripts/package-offline.sh` 生成，**单文件须小于 100MB** 才能被 GitHub 直推接受）。**勿**把 `torch-*.whl`、几百 MB 的依赖打进 Git；构建时仍由 Docker 内 **PyTorch CPU 源**现装 `torch`（与「纯 PyPI 拉全量」相比，脚本只锁 IOPaint 源码 + 少量小 wheel）。若云托管**构建仍超时**，请调大构建时限/资源，或本机 `docker build` 后**推 TCR/CCR** 用现成镜像。
+Dockerfile 为**多阶段**：**默认**用 PyPI 装 `iopaint`（**无需** `iopaint-offline.tar.gz`），避免云构建报 `not found`。**离线包**：用 `scripts/package-offline.sh` 生成且小于 100MB 的 `iopaint-offline.tar.gz` 后，以 `docker build --target offline` 构建，或在云托管中把**构建目标**设为 `offline`。**勿**把 `torch-*.whl` 等大文件提交进 Git。若**构建仍超时**，请调大构建时限/资源，或本机打镜像后推 TCR/CCR。
 
 ## 健康检查
 
