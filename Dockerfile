@@ -21,20 +21,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# 1) 腾讯云 PyPI 加速常规包；2) 官方 PyTorch **CPU** wheel；3) 本目录下 `iopaint-local.tar.gz` 解压后 `pip install`
-# 打包：在 IOPaint 仓库根目录（含 pyproject.toml）执行
-#   tar -czf iopaint-local.tar.gz .
-# 将 `iopaint-local.tar.gz` 与 Dockerfile 同目录提交，部署时由下面解压到 /build/iopaint
-COPY iopaint-local.tar.gz /build/
-RUN mkdir -p /build/iopaint \
-    && tar -xzf /build/iopaint-local.tar.gz -C /build/iopaint \
-    && pip config set global.index-url https://mirrors.cloud.tencent.com/pypi/simple \
-    && pip config set global.trusted-host mirrors.cloud.tencent.com \
-    && pip install --upgrade pip \
-    && pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu \
-    && pip install --no-cache-dir "Pillow==9.5.0" \
-    && pip install --no-cache-dir /build/iopaint \
-    && rm -rf /build/iopaint /build/iopaint-local.tar.gz
+# 本目录需有 `iopaint-offline.tar.gz`（由 scripts/package-offline.sh 生成，单文件须 <100MB 才能上 GitHub）
+# 包内为 iopaint_local/ + 可选 iopaint_packages/packages/*.whl；勿含 torch-*.whl，下方用 PyPI CPU 源现装
+COPY iopaint-offline.tar.gz /build/
+RUN set -eux; \
+    mkdir -p /build/work; \
+    tar -xzf /build/iopaint-offline.tar.gz -C /build/work; \
+    pip config set global.index-url https://mirrors.cloud.tencent.com/pypi/simple; \
+    pip config set global.trusted-host mirrors.cloud.tencent.com; \
+    pip install --upgrade pip; \
+    pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu; \
+    pip install --no-cache-dir "Pillow==9.5.0"; \
+    if [ -d /build/work/iopaint_packages/packages ] && [ -n "$$(find /build/work/iopaint_packages/packages -name '*.whl' -print -quit)" ]; then \
+        pip install --no-cache-dir -f /build/work/iopaint_packages/packages /build/work/iopaint_local; \
+    else \
+        pip install --no-cache-dir /build/work/iopaint_local; \
+    fi; \
+    rm -rf /build/work /build/iopaint-offline.tar.gz
 
 # 与微信云托管/K8s 常注入的 PORT=8080 一致；控制台「服务端口」须与此相同。
 ENV PORT=8080 \

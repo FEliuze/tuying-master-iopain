@@ -1,7 +1,9 @@
 README.md
 .git
 .gitignore
-# 与 iopaint-local.tar.gz 二选一入仓；本目录仅用于本地解压，勿打进构建上下文
-iopaint-local/
+# 大目录不传入构建上下文，仅 iopaint-offline.tar.gz 会 COPY
+iopaint_local/
+iopaint_packages/
+scripts/
 **/__pycache__
 *.pyc

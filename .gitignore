@@ -1,0 +1,5 @@
+# 本地大目录不提交，只提交经 scripts/package-offline.sh 产出的 iopaint-offline.tar.gz
+iopaint_local/
+iopaint_packages/
+# 曾用 LFS/旧命名
+iopaint-local.tar.gz
