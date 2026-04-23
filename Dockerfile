@@ -1,9 +1,8 @@
 # IOPaint HTTP（REST `/api/v1/*`），供 tuying-tools 通过 IOPAINT_BASE_URL 调用。
-# 多阶段：默认 `pypi` 无需本目录的 iopaint-offline.tar.gz，避免云构建 COPY 报 not found。
-# 使用本地 tar 时：构建参数指定 target=offline，且同目录有 iopaint-offline.tar.gz
+# 多阶段：默认 `pypi` 无需 iopaint-offline.tar.gz；`offline` 需同目录有该包且 --target offline
 #
-# 勿用仅 `lama-cleaner` 的旧镜像。须 iopaint>=1.3。
-# 先装 CPU 版 torch（官方 wheel），再装 iopaint，避免 PyPI 再拉一份大体积 torch。
+# 云托管「create_build_image : creating」会长时间无新日志：多为下面某条 RUN 在装 torch（可达数十分钟），属正常。
+# 已拆成多条 RUN 并带 echo，便于在支持「按层/按步」的构建日志里看到卡在哪一步。
 
 FROM python:3.11-slim-bookworm AS base
 
@@ -20,21 +19,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-# 启动脚本往 stdout 打一行日志，云托管「运行日志」可见（免费版往往无 shell）
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# ---------- 1) 离线包（有 iopaint-offline.tar.gz 时：docker build --target offline）----------
+# 监听端口：以环境变量 PORT 为准（与云托管控制台「容器端口/探活」一致）。
+# 镜像默认 PORT=80；若平台注入 PORT=8080 等，会覆盖下方 ENV，无需改 Dockerfile。
+
+# ---------- 1) 离线包：docker build --target offline，且目录含 iopaint-offline.tar.gz ----------
 FROM base AS offline
-# 由 scripts/package-offline.sh 生成，单文件须 <100MB
 COPY iopaint-offline.tar.gz /build/
 RUN set -eux; \
     mkdir -p /build/work; \
     tar -xzf /build/iopaint-offline.tar.gz -C /build/work; \
     pip config set global.index-url https://mirrors.cloud.tencent.com/pypi/simple; \
     pip config set global.trusted-host mirrors.cloud.tencent.com; \
-    pip install --upgrade pip; \
-    pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu; \
+    pip install --upgrade pip
+RUN set -eux; echo "[iopaint-service build] $$(date -u) installing torch+torchvision (CPU)..."; \
+    pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+RUN set -eux; echo "[iopaint-service build] $$(date -u) installing Pillow + iopaint_local..."; \
     pip install --no-cache-dir "Pillow==9.5.0"; \
     if [ -d /build/work/iopaint_packages/packages ] && [ -n "$$(find /build/work/iopaint_packages/packages -name '*.whl' -print -quit)" ]; then \
         pip install --no-cache-dir -f /build/work/iopaint_packages/packages /build/work/iopaint_local; \
@@ -47,19 +47,20 @@ ENV PORT=80 \
     IOPAINT_MODEL=lama \
     IOPAINT_DEVICE=cpu
 EXPOSE 80
-CMD ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["/bin/sh", "-c", "exec iopaint start --host=0.0.0.0 --port=\"${PORT:-80}\" --model=\"${IOPAINT_MODEL:-lama}\" --device=\"${IOPAINT_DEVICE:-cpu}\" --enable-realesrgan --realesrgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-gfpgan --gfpgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-restoreformer --restoreformer-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-remove-bg --remove-bg-device=\"${IOPAINT_DEVICE:-cpu}\" --no-half"]
 
-# ---------- 2) 默认：PyPI 安装 iopaint（无离线包、云构建推荐）----------
+# ---------- 2) 默认：PyPI 安装 iopaint（无离线包，云构建常用）----------
 FROM base AS pypi
 RUN pip config set global.index-url https://mirrors.cloud.tencent.com/pypi/simple \
     && pip config set global.trusted-host mirrors.cloud.tencent.com \
-    && pip install --upgrade pip \
-    && pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu \
-    && pip install --no-cache-dir "Pillow==9.5.0" "iopaint>=1.3.0,<2"
+    && pip install --upgrade pip
+RUN set -eux; echo "[iopaint-service build] $$(date -u) installing torch+torchvision (CPU), 本步通常最慢..."; \
+    pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+RUN set -eux; echo "[iopaint-service build] $$(date -u) installing Pillow + iopaint..."; \
+    pip install --no-cache-dir "Pillow==9.5.0" "iopaint>=1.3.0,<2"
 
-# 无 COPY；「最后一个 FROM」为默认构建目标，需 offline 时显式 --target offline
 ENV PORT=80 \
     IOPAINT_MODEL=lama \
     IOPAINT_DEVICE=cpu
 EXPOSE 80
-CMD ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["/bin/sh", "-c", "exec iopaint start --host=0.0.0.0 --port=\"${PORT:-80}\" --model=\"${IOPAINT_MODEL:-lama}\" --device=\"${IOPAINT_DEVICE:-cpu}\" --enable-realesrgan --realesrgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-gfpgan --gfpgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-restoreformer --restoreformer-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-remove-bg --remove-bg-device=\"${IOPAINT_DEVICE:-cpu}\" --no-half"]

@@ -34,9 +34,9 @@ Dockerfile 为**多阶段**：**默认**用 PyPI 装 `iopaint`（**无需** `iop
 
 本镜像在预装 PyTorch 的底包上 `pip install iopaint`；与「纯 slim + 全量 pip 装 torch」相比，**构建阶段**明显更短。若 pip 因版本约束仍升级 torch，可在控制台**调大构建超时**，或改成本地打镜像后推送。
 
-## 部署排错：Readiness `connection refused :80`
+## 部署排错：Readiness `connection refused`
 
-云托管会向容器注入 `PORT`（多为 **8080**）。若服务仍按模板使用**服务端口 80** 做探活，而进程按 `PORT` 监听 **8080**，会出现 `dial tcp ...:80: connection refused`。请在控制台将**容器/服务端口**改为与 `PORT` 一致（默认 **8080**），或与运维确认环境变量中的 `PORT` 值。
+进程监听端口 = 环境变量 **`PORT`**（镜像默认 **80**；若平台注入 `PORT=8080` 则以注入为准）。**探活/服务端口**须与之一致：若探活连 **80** 而进程只在 **8080** 监听（或相反），会出现 `connection refused`。在控制台统一 **容器端口、健康检查端口、环境变量 PORT**。
 
 ## 资源
 
