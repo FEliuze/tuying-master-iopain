@@ -1,5 +1,7 @@
-# 本地大目录不提交，只提交经 scripts/package-offline.sh 产出的 iopaint-offline.tar.gz
+# 本地大目录不提交。仅提交 <100MB 的 iopaint-offline.tar.gz；勿提交整目录 whl
 iopaint_local/
 iopaint_packages/
-# 曾用 LFS/旧命名
+# 曾用/错误命名，体积常超 GitHub 限制，禁止进仓库
 iopaint-local.tar.gz
+**/iopaint_packages/
+**/iopaint-local.tar.gz
