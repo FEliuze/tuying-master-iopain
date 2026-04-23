@@ -21,12 +21,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# 1) 腾讯云 PyPI 加速常规包；2) 官方 PyTorch **CPU** wheel（与 CUDA 底包不同，适合云托管纯 CPU）
+# 1) 腾讯云 PyPI 加速常规包；2) 官方 PyTorch **CPU** wheel；3) 本目录下本地 iopaint 源码
+# 构建前将 IOPaint 仓库放到 `iopaint-local/`（与 Dockerfile 同目录，须含 pyproject.toml，且可 `pip install` 该目录）
+COPY iopaint-local /build/iopaint
 RUN pip config set global.index-url https://mirrors.cloud.tencent.com/pypi/simple \
     && pip config set global.trusted-host mirrors.cloud.tencent.com \
     && pip install --upgrade pip \
     && pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu \
-    && pip install --no-cache-dir "Pillow==9.5.0" "iopaint>=1.3.0,<2"
+    && pip install --no-cache-dir "Pillow==9.5.0" \
+    && pip install --no-cache-dir /build/iopaint \
+    && rm -rf /build/iopaint
 
 # 与微信云托管/K8s 常注入的 PORT=8080 一致；控制台「服务端口」须与此相同。
 ENV PORT=8080 \

@@ -1,5 +1,8 @@
 README.md
 .git
 .gitignore
+iopaint-local/.git
+iopaint-local/**/__pycache__
+iopaint-local/**/.mypy_cache
 **/__pycache__
 *.pyc
