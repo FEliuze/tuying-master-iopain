@@ -1,1 +1,2 @@
 iopaint_packages/* filter=lfs diff=lfs merge=lfs -text
+iopaint_packages/** filter=lfs diff=lfs merge=lfs -text
