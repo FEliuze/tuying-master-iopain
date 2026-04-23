@@ -1,8 +1,7 @@
 README.md
 .git
 .gitignore
-iopaint-local/.git
-iopaint-local/**/__pycache__
-iopaint-local/**/.mypy_cache
+# 与 iopaint-local.tar.gz 二选一入仓；本目录仅用于本地解压，勿打进构建上下文
+iopaint-local/
 **/__pycache__
 *.pyc
