@@ -20,6 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+# 启动脚本往 stdout 打一行日志，云托管「运行日志」可见（免费版往往无 shell）
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # ---------- 1) 离线包（有 iopaint-offline.tar.gz 时：docker build --target offline）----------
 FROM base AS offline
@@ -44,7 +47,7 @@ ENV PORT=8080 \
     IOPAINT_MODEL=lama \
     IOPAINT_DEVICE=cpu
 EXPOSE 8080
-CMD ["/bin/sh", "-c", "exec iopaint start --host=0.0.0.0 --port=\"${PORT:-8080}\" --model=\"${IOPAINT_MODEL:-lama}\" --device=\"${IOPAINT_DEVICE:-cpu}\" --enable-realesrgan --realesrgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-gfpgan --gfpgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-restoreformer --restoreformer-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-remove-bg --remove-bg-device=\"${IOPAINT_DEVICE:-cpu}\" --no-half"]
+CMD ["/usr/local/bin/docker-entrypoint.sh"]
 
 # ---------- 2) 默认：PyPI 安装 iopaint（无离线包、云构建推荐）----------
 FROM base AS pypi
@@ -59,4 +62,4 @@ ENV PORT=8080 \
     IOPAINT_MODEL=lama \
     IOPAINT_DEVICE=cpu
 EXPOSE 8080
-CMD ["/bin/sh", "-c", "exec iopaint start --host=0.0.0.0 --port=\"${PORT:-8080}\" --model=\"${IOPAINT_MODEL:-lama}\" --device=\"${IOPAINT_DEVICE:-cpu}\" --enable-realesrgan --realesrgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-gfpgan --gfpgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-restoreformer --restoreformer-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-remove-bg --remove-bg-device=\"${IOPAINT_DEVICE:-cpu}\" --no-half"]
+CMD ["/usr/local/bin/docker-entrypoint.sh"]
