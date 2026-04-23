@@ -16,12 +16,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libgl1 \
     libglib2.0-0 \
+    socat \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 监听端口：以环境变量 PORT 为准，须与云托管「容器端口 / Readiness&Liveness 探针」完全一致（不是只改其一）。
-# 默认 8080：与常见注入一致，且非特权端口（部分环境非 root 无法 bind 80，会导致探活 connection refused）。
+# 由 docker-entrypoint.sh 用 socat 在 PORT(默认 80) 上监听，转发到 127.0.0.1:8080 的 iopaint；缓解「探针已打 :80 而 iopaint 尚未 listen」的 connection refused。
+# 云托管里「容器端口」和 PORT 建议 80 一致；勿仅设 PORT=8080 而探针仍 80。
+
+COPY docker-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # ---------- 1) 离线包：docker build --target offline，且目录含 iopaint-offline.tar.gz ----------
 FROM base AS offline
@@ -43,11 +47,11 @@ RUN set -eux; echo "[iopaint-service build] $$(date -u) installing Pillow + iopa
     fi; \
     rm -rf /build/work /build/iopaint-offline.tar.gz
 
-ENV PORT=8080 \
+ENV PORT=80 \
     IOPAINT_MODEL=lama \
     IOPAINT_DEVICE=cpu
-EXPOSE 8080
-CMD ["/bin/sh", "-c", "exec iopaint start --host=0.0.0.0 --port=\"${PORT:-8080}\" --model=\"${IOPAINT_MODEL:-lama}\" --device=\"${IOPAINT_DEVICE:-cpu}\" --enable-realesrgan --realesrgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-gfpgan --gfpgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-restoreformer --restoreformer-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-remove-bg --remove-bg-device=\"${IOPAINT_DEVICE:-cpu}\" --no-half"]
+EXPOSE 80
+CMD ["/entrypoint.sh"]
 
 # ---------- 2) 默认：PyPI 安装 iopaint（无离线包，云构建常用）----------
 FROM base AS pypi
@@ -59,8 +63,8 @@ RUN set -eux; echo "[iopaint-service build] $$(date -u) installing torch+torchvi
 RUN set -eux; echo "[iopaint-service build] $$(date -u) installing Pillow + iopaint..."; \
     pip install --no-cache-dir "Pillow==9.5.0" "iopaint>=1.3.0,<2"
 
-ENV PORT=8080 \
+ENV PORT=80 \
     IOPAINT_MODEL=lama \
     IOPAINT_DEVICE=cpu
-EXPOSE 8080
-CMD ["/bin/sh", "-c", "exec iopaint start --host=0.0.0.0 --port=\"${PORT:-8080}\" --model=\"${IOPAINT_MODEL:-lama}\" --device=\"${IOPAINT_DEVICE:-cpu}\" --enable-realesrgan --realesrgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-gfpgan --gfpgan-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-restoreformer --restoreformer-device=\"${IOPAINT_DEVICE:-cpu}\" --enable-remove-bg --remove-bg-device=\"${IOPAINT_DEVICE:-cpu}\" --no-half"]
+EXPOSE 80
+CMD ["/entrypoint.sh"]

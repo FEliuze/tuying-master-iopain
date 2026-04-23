@@ -1,23 +1,28 @@
 #!/bin/sh
-# 启动前打印到 stdout，云托管「运行日志」里可直接看到（免费版通常无进容器 shell）
+# 云托管探针常打固定「容器端口」（多为 80）。iopaint 冷启较慢时，直连 iopaint 的 listen 会晚，TCP 易 connection refused。
+# 由 socat 在 PORT（默认 80）上先监听，K8S TCP 探活易过；再转发到 127.0.0.1:8080 上的 iopaint。
 set -e
-PORT="${PORT:-8080}"
-echo "========================================"
-echo "[iopaint-service] start $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-echo "[iopaint-service] PORT=$PORT host=0.0.0.0 model=${IOPAINT_MODEL:-lama} device=${IOPAINT_DEVICE:-cpu}"
-# 发行名在 PyPI 上多为 iopaint
-if command -v pip >/dev/null 2>&1; then
-  pip show iopaint 2>/dev/null | sed -n 's/^Version: /[iopaint-service] iopaint version /p' || true
-fi
-echo "[iopaint-service] after listen, expect HTTP 200: /api/v1/server-config /api/v1/model /docs"
-echo "========================================"
-exec iopaint start \
-  --host=0.0.0.0 \
-  --port="$PORT" \
-  --model="${IOPAINT_MODEL:-lama}" \
-  --device="${IOPAINT_DEVICE:-cpu}" \
-  --enable-realesrgan --realesrgan-device="${IOPAINT_DEVICE:-cpu}" \
-  --enable-gfpgan --gfpgan-device="${IOPAINT_DEVICE:-cpu}" \
-  --enable-restoreformer --restoreformer-device="${IOPAINT_DEVICE:-cpu}" \
-  --enable-remove-bg --remove-bg-device="${IOPAINT_DEVICE:-cpu}" \
-  --no-half
+OUT="${PORT:-80}"
+INNER=8080
+IODEV="${IOPAINT_DEVICE:-cpu}"
+MODEL="${IOPAINT_MODEL:-lama}"
+
+export PYTHONUNBUFFERED=1
+echo "[iopaint-service] $(date -u) probes: :$OUT  ->  iopaint 127.0.0.1:$INNER"
+echo "[iopaint-service] starting iopaint in background (pid TBD)..."
+
+iopaint start \
+  --host=127.0.0.1 \
+  --port="$INNER" \
+  --model="$MODEL" \
+  --device="$IODEV" \
+  --enable-realesrgan --realesrgan-device="$IODEV" \
+  --enable-gfpgan --gfpgan-device="$IODEV" \
+  --enable-restoreformer --restoreformer-device="$IODEV" \
+  --enable-remove-bg --remove-bg-device="$IODEV" \
+  --no-half &
+
+sleep 1
+echo "[iopaint-service] starting socat (foreground) -> exec"
+
+exec socat TCP-LISTEN:"$OUT",fork,reuseaddr,bind=0.0.0.0 TCP:127.0.0.1:"$INNER"
