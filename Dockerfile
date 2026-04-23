@@ -43,10 +43,10 @@ RUN set -eux; \
     fi; \
     rm -rf /build/work /build/iopaint-offline.tar.gz
 
-ENV PORT=8080 \
+ENV PORT=80 \
     IOPAINT_MODEL=lama \
     IOPAINT_DEVICE=cpu
-EXPOSE 8080
+EXPOSE 80
 CMD ["/usr/local/bin/docker-entrypoint.sh"]
 
 # ---------- 2) 默认：PyPI 安装 iopaint（无离线包、云构建推荐）----------
@@ -58,8 +58,8 @@ RUN pip config set global.index-url https://mirrors.cloud.tencent.com/pypi/simpl
     && pip install --no-cache-dir "Pillow==9.5.0" "iopaint>=1.3.0,<2"
 
 # 无 COPY；「最后一个 FROM」为默认构建目标，需 offline 时显式 --target offline
-ENV PORT=8080 \
+ENV PORT=80 \
     IOPAINT_MODEL=lama \
     IOPAINT_DEVICE=cpu
-EXPOSE 8080
+EXPOSE 80
 CMD ["/usr/local/bin/docker-entrypoint.sh"]
