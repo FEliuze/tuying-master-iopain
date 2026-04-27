@@ -18,12 +18,21 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     XDG_CACHE_HOME=/opt/iopaint-cache \
     HF_HOME=/opt/iopaint-cache/huggingface
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    curl \
-    libgl1 \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+# 国内直连 deb.debian.org 易超时。本镜像基座为 bookworm，固定写源避免 RUN 里 $/$$ 在 Docker 预处理器与 sh 间歧义（易 exit 2）。升级 FROM 为 trixie 时需同步改下列代号
+RUN set -eux; \
+    rm -f /etc/apt/sources.list.d/debian.sources; \
+    printf '%s\n' \
+      "deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm main" \
+      "deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm-updates main" \
+      "deb https://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main" \
+    > /etc/apt/sources.list; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+      ca-certificates \
+      curl \
+      libgl1 \
+      libglib2.0-0; \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -51,9 +60,10 @@ RUN set -eux; echo "[iopaint-service build] $$(date -u) installing Pillow + iopa
         pip install --no-cache-dir /build/work/iopaint_local; \
     fi; \
     rm -rf /build/work /build/iopaint-offline.tar.gz
-# rembg 会拉高新版 Pillow；iopaint 需 Pillow==9.5.0，装完后强制回锁，避免运行时不一致
+# rembg 会拉高新版 Pillow；iopaint 需 Pillow==9.5.0。不指定版本时 pip 易与 torch/numpy 解析失败（exit 1），故固定版本并先约束 numpy<2
 RUN set -eux; echo "[iopaint-service build] $$(date -u) rembg + onnxruntime (RemoveBG)..."; \
-    pip install --no-cache-dir onnxruntime rembg; \
+    pip install --no-cache-dir "onnxruntime==1.17.3" "numpy>=1.26.4,<2"; \
+    pip install --no-cache-dir "rembg==2.0.59"; \
     pip install --no-cache-dir --force-reinstall "Pillow==9.5.0" "numpy>=1.26.4,<2"
 
 RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading lama to $$XDG_CACHE_HOME (首启 listen 更快)..."; \
@@ -86,9 +96,10 @@ RUN set -eux; echo "[iopaint-service build] $$(date -u) installing torch+torchvi
     pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
 RUN set -eux; echo "[iopaint-service build] $$(date -u) installing Pillow + iopaint..."; \
     pip install --no-cache-dir "Pillow==9.5.0" "iopaint>=1.3.0,<2"
-# rembg 会拉高新版 Pillow；iopaint 需 Pillow==9.5.0，装完后回锁
+# rembg 会拉高新版 Pillow；iopaint 需 Pillow==9.5.0。固定 onnxruntime/rembg 版本并先约束 numpy<2，避免 pip 解析与 torch 冲突
 RUN set -eux; echo "[iopaint-service build] $$(date -u) rembg + onnxruntime (RemoveBG)..."; \
-    pip install --no-cache-dir onnxruntime rembg; \
+    pip install --no-cache-dir "onnxruntime==1.17.3" "numpy>=1.26.4,<2"; \
+    pip install --no-cache-dir "rembg==2.0.59"; \
     pip install --no-cache-dir --force-reinstall "Pillow==9.5.0" "numpy>=1.26.4,<2"
 
 RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading lama to $$XDG_CACHE_HOME (首启 listen 更快)..."; \
