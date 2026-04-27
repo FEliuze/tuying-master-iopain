@@ -55,6 +55,7 @@ Dockerfile 为**多阶段**：**默认**用 PyPI 装 `iopaint`（**无需** `iop
 - **与 pip 没装完无关**；也**不等于** iopain 子进程没起来，多数情况是：**默认擦除模型（lama 等，约 196MB）在首次拉取完之前**，Uvicorn **不会**在 `127.0.0.1:8080` 上 `listen`。此时 **:80 上 socat 已就绪**（TCP 探活可能过），但转发到 8080 **无监听进程** → `Connection refused` → 网关 **502**。
 - **本仓库 Dockerfile 已在构建阶段**用 `XDG_CACHE_HOME`（固定为 `/opt/iopaint-cache`）**预拉 lama**，使容器启动后尽量**很快**在 8080 上可连、减轻长时间 502。
 - 若日志里**仍有**大体积进度条（`196M/196M` 等）且 502 持续较久：多为 **`docker-entrypoint.sh` 中开启的扩图/去背景等插件**（`--enable-realesrgan` 等）在**首启**时继续下载权重。可**等待**完成，或**按需**收紧入口脚本里的 `--enable-*` 以换首启时间（会牺牲对应能力，请与业务需求权衡）。
+- 若出现 **`ModuleNotFoundError: No module named 'rembg'`**：入口脚本启用了 **`--enable-remove-bg`**，需在镜像里 **`pip install onnxruntime rembg`**（本仓库 Dockerfile 已包含）；勿依赖 iopaint 主包自动装上全部可选依赖。
 - 云构建/运行环境需能访问**模型来源**；完全无外网时需在镜像或存储侧自备权重并保证路径与 iopain 一致。
 
 ## 资源

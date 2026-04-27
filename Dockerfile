@@ -48,6 +48,9 @@ RUN set -eux; echo "[iopaint-service build] $$(date -u) installing Pillow + iopa
         pip install --no-cache-dir /build/work/iopaint_local; \
     fi; \
     rm -rf /build/work /build/iopaint-offline.tar.gz
+# docker-entrypoint 开了 --enable-remove-bg，需 rembg + onnxruntime，否则启动期 import 失败、8080 永不 listen
+RUN set -eux; echo "[iopaint-service build] $$(date -u) rembg + onnxruntime (RemoveBG)..."; \
+    pip install --no-cache-dir onnxruntime rembg
 
 RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading lama to $$XDG_CACHE_HOME (首启 8080 监听更快)..."; \
     mkdir -p /opt/iopaint-cache; \
@@ -68,6 +71,9 @@ RUN set -eux; echo "[iopaint-service build] $$(date -u) installing torch+torchvi
     pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
 RUN set -eux; echo "[iopaint-service build] $$(date -u) installing Pillow + iopaint..."; \
     pip install --no-cache-dir "Pillow==9.5.0" "iopaint>=1.3.0,<2"
+# docker-entrypoint 开了 --enable-remove-bg，需 rembg + onnxruntime
+RUN set -eux; echo "[iopaint-service build] $$(date -u) rembg + onnxruntime (RemoveBG)..."; \
+    pip install --no-cache-dir onnxruntime rembg
 
 RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading lama to $$XDG_CACHE_HOME (首启 8080 监听更快)..."; \
     mkdir -p /opt/iopaint-cache; \
