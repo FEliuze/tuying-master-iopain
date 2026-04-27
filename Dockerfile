@@ -6,10 +6,12 @@
 
 FROM python:3.11-slim-bookworm AS base
 
+# 模型与缓存目录；构建中预拉 lama，避免首启长时间无 8080 监听致 socat 后 502
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
-    PIP_PREFER_BINARY=1
+    PIP_PREFER_BINARY=1 \
+    XDG_CACHE_HOME=/opt/iopaint-cache
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -47,6 +49,10 @@ RUN set -eux; echo "[iopaint-service build] $$(date -u) installing Pillow + iopa
     fi; \
     rm -rf /build/work /build/iopaint-offline.tar.gz
 
+RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading lama to $$XDG_CACHE_HOME (首启 8080 监听更快)..."; \
+    mkdir -p /opt/iopaint-cache; \
+    python -c "from iopaint.download import cli_download_model; cli_download_model('lama')"
+
 ENV PORT=80 \
     IOPAINT_MODEL=lama \
     IOPAINT_DEVICE=cpu
@@ -62,6 +68,10 @@ RUN set -eux; echo "[iopaint-service build] $$(date -u) installing torch+torchvi
     pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
 RUN set -eux; echo "[iopaint-service build] $$(date -u) installing Pillow + iopaint..."; \
     pip install --no-cache-dir "Pillow==9.5.0" "iopaint>=1.3.0,<2"
+
+RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading lama to $$XDG_CACHE_HOME (首启 8080 监听更快)..."; \
+    mkdir -p /opt/iopaint-cache; \
+    python -c "from iopaint.download import cli_download_model; cli_download_model('lama')"
 
 ENV PORT=80 \
     IOPAINT_MODEL=lama \
