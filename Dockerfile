@@ -5,13 +5,18 @@
 # 已拆成多条 RUN 并带 echo，便于在支持「按层/按步」的构建日志里看到卡在哪一步。
 
 FROM python:3.11-slim-bookworm AS base
+# 构建拉 HF 慢或失败时（如 `docker build --build-arg HF_ENDPOINT=https://hf-mirror.com`），huggingface_hub 会读此变量；留空则直连官方
+ARG HF_ENDPOINT=
+ENV HF_ENDPOINT=${HF_ENDPOINT}
 
 # 模型与缓存目录；构建中预拉 lama，减轻首启长时间无监听致 502
+# HF_HOME：RemoveBG（briaai/RMBG-1.4）等走 huggingface_hub 时读此目录；与构建阶段预拉一致，避免运行环境无外网时启动失败
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
     PIP_PREFER_BINARY=1 \
-    XDG_CACHE_HOME=/opt/iopaint-cache
+    XDG_CACHE_HOME=/opt/iopaint-cache \
+    HF_HOME=/opt/iopaint-cache/huggingface
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -54,6 +59,10 @@ RUN set -eux; echo "[iopaint-service build] $$(date -u) rembg + onnxruntime (Rem
 RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading lama to $$XDG_CACHE_HOME (首启 listen 更快)..."; \
     mkdir -p /opt/iopaint-cache; \
     python -c "from iopaint.download import cli_download_model; cli_download_model('lama')"
+# 与 --enable-remove-bg 一致：bria RMBG 原从 HuggingFace 首启拉取，运行环境无外网会 OSError: Network is unreachable
+RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading briaai/RMBG-1.4 to HF cache (RemoveBG)..."; \
+    mkdir -p /opt/iopaint-cache/huggingface; \
+    python -c "from huggingface_hub import hf_hub_download; hf_hub_download('briaai/RMBG-1.4', 'model.pth')"
 
 ENV PORT=80 \
     IOPAINT_MODEL=lama \
@@ -78,6 +87,9 @@ RUN set -eux; echo "[iopaint-service build] $$(date -u) rembg + onnxruntime (Rem
 RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading lama to $$XDG_CACHE_HOME (首启 listen 更快)..."; \
     mkdir -p /opt/iopaint-cache; \
     python -c "from iopaint.download import cli_download_model; cli_download_model('lama')"
+RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading briaai/RMBG-1.4 to HF cache (RemoveBG)..."; \
+    mkdir -p /opt/iopaint-cache/huggingface; \
+    python -c "from huggingface_hub import hf_hub_download; hf_hub_download('briaai/RMBG-1.4', 'model.pth')"
 
 ENV PORT=80 \
     IOPAINT_MODEL=lama \

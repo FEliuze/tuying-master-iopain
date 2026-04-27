@@ -54,7 +54,8 @@ Dockerfile 为**多阶段**：**默认**用 PyPI 装 `iopaint`（**无需** `iop
 - **本仓库 Dockerfile 已在构建阶段**用 `XDG_CACHE_HOME`（固定为 `/opt/iopaint-cache`）**预拉 lama**，使容器启动后尽量**很快**可连、减轻长时间 502。
 - 若日志里**仍有**大体积进度条（`196M/196M` 等）且 502 持续较久：多为 **`docker-entrypoint.sh` 中开启的扩图/去背景等插件**（`--enable-realesrgan` 等）在**首启**时继续下载权重。可**等待**完成，或**按需**收紧入口脚本里的 `--enable-*` 以换首启时间（会牺牲对应能力，请与业务需求权衡）。
 - 若出现 **`ModuleNotFoundError: No module named 'rembg'`**：入口脚本启用了 **`--enable-remove-bg`**，需在镜像里 **`pip install onnxruntime rembg`**（本仓库 Dockerfile 已包含）；勿依赖 iopaint 主包自动装上全部可选依赖。
-- 云构建/运行环境需能访问**模型来源**；完全无外网时需在镜像或存储侧自备权重并保证路径与 iopain 一致。
+- 若启动时 **`huggingface.co`、Connection、Network is unreachable、`briaai/RMBG-1.4/.../model.pth`**：默认识别 RemoveBG 会**向 HuggingFace 拉 Bria 模型**；**运行实例无外网/不能访问 HF** 时会失败。本仓库已在**构建阶段**用 **`HF_HOME=/opt/iopaint-cache/huggingface`** 预下该文件；请**重新构建并发布**镜像。若**构建机**也拉不到，可在构建时设 **`HF_ENDPOINT`**（如国内 HF 镜像）或本机有网打镜像后推 TCR。其它插件（Real-ESRGAN 等）首次调用仍可能下权重，可等待或关对应 `--enable-*`。
+- 云构建/运行需能拉取**构建阶段**所依赖的模型；**完全无外网**时改自制离线层或关插件。
 
 ## 资源
 
