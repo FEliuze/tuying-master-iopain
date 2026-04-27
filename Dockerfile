@@ -63,6 +63,13 @@ RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading lama to 
 RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading briaai/RMBG-1.4 to HF cache (RemoveBG)..."; \
     mkdir -p /opt/iopaint-cache/huggingface; \
     python -c "from huggingface_hub import hf_hub_download; hf_hub_download('briaai/RMBG-1.4', 'model.pth')"
+# 与 --enable-realesrgan 默认 realesr-general-x4v3 一致，避免首启从 GitHub 拉 pth 期间无 listen（旧版 socat 时表现为大量 connect 8080 refused）
+RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading Real-ESRGAN realesr-general-x4v3..."; \
+    mkdir -p /opt/iopaint-cache/torch/hub/checkpoints; \
+    f=/opt/iopaint-cache/torch/hub/checkpoints/realesr-general-x4v3.pth; \
+    if [ ! -f "$$f" ]; then \
+      curl -fsSL -o "$$f" "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth"; \
+    fi
 
 ENV PORT=80 \
     IOPAINT_MODEL=lama \
@@ -90,6 +97,12 @@ RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading lama to 
 RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading briaai/RMBG-1.4 to HF cache (RemoveBG)..."; \
     mkdir -p /opt/iopaint-cache/huggingface; \
     python -c "from huggingface_hub import hf_hub_download; hf_hub_download('briaai/RMBG-1.4', 'model.pth')"
+RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading Real-ESRGAN realesr-general-x4v3..."; \
+    mkdir -p /opt/iopaint-cache/torch/hub/checkpoints; \
+    f=/opt/iopaint-cache/torch/hub/checkpoints/realesr-general-x4v3.pth; \
+    if [ ! -f "$$f" ]; then \
+      curl -fsSL -o "$$f" "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth"; \
+    fi
 
 ENV PORT=80 \
     IOPAINT_MODEL=lama \

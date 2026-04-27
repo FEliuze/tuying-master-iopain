@@ -20,6 +20,8 @@ Dockerfile 为**多阶段**：**默认**用 PyPI 装 `iopaint`（**无需** `iop
 
 **微信云托管 / 默认识别端口**：平台常对容器的 **:80** 做 **TCP 存活/就绪** 探测。本镜像 **默认 `PORT=80`、EXPOSE 80**（`docker-entrypoint.sh` 中 `iopaint` 监听 `0.0.0.0:$PORT`），与默认识别一致。若你改为 **8080**，须同时在控制台将 **容器端口、健康检查端口** 改为 **8080**，**或** 仅设环境变量 **`PORT=80`** 保持与平台默认识别一致。
 
+**若日志里仍出现 `socat` 连 `127.0.0.1:8080`**：说明**还有实例在跑旧镜像**（曾用 socat 转发）；**当前仓库**已不再使用 socat。请**全量发布新镜像**并结束旧版本/旧 Pod，避免混跑。首启阶段若插件在拉权重，旧方案下会长时间 **Connection refused**；本仓库已在构建中预拉 **lama、Bria RMBG、Real-ESRGAN realesr-general-x4v3** 等以缩短该窗口；**GFPGAN、RestoreFormer** 等若仍首下，可再收紧 `--enable-*` 或按同样方式预置权重。
+
 ## 部署排错：云托管「云端调试」里 /api/v1/server-config 为 404
 
 `iopaint start` 启动的 FastAPI 应用**确实注册**了 `GET /api/v1/server-config`（与「接口不存在」无矛盾时，问题在**请求没进到 IOPaint 进程**或**路径写错**）。请按序核对：
