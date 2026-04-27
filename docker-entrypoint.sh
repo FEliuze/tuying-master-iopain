@@ -1,7 +1,7 @@
 #!/bin/sh
-# 云托管「容器端口」与下面 PORT（默认 8080）保持一致；iopaint 直接对外监听，无 socat（避免与 8080 双占）。
+# 微信云托管默认识别/存活就绪探针多为 :80；默认 PORT=80。若需 8080：环境变量 PORT=8080，且控制台「容器端口+健康检查」改为 8080。
 set -e
-PORT="${PORT:-8080}"
+PORT="${PORT:-80}"
 IODEV="${IOPAINT_DEVICE:-cpu}"
 MODEL="${IOPAINT_MODEL:-lama}"
 

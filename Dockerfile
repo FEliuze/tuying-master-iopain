@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# 由 docker-entrypoint.sh 直接 iopaint listen 0.0.0.0:PORT，默认 8080；与云托管「容器端口」一致即可。
+# 由 docker-entrypoint.sh 直接 iopaint listen 0.0.0.0:PORT；默认 80 以匹配云托管默认识别/探活；可覆写 PORT（如 8080）并同步控制台。
 
 COPY docker-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
@@ -46,18 +46,19 @@ RUN set -eux; echo "[iopaint-service build] $$(date -u) installing Pillow + iopa
         pip install --no-cache-dir /build/work/iopaint_local; \
     fi; \
     rm -rf /build/work /build/iopaint-offline.tar.gz
-# docker-entrypoint 开了 --enable-remove-bg，需 rembg + onnxruntime，否则启动期 import 失败、8080 永不 listen
+# rembg 会拉高新版 Pillow；iopaint 需 Pillow==9.5.0，装完后强制回锁，避免运行时不一致
 RUN set -eux; echo "[iopaint-service build] $$(date -u) rembg + onnxruntime (RemoveBG)..."; \
-    pip install --no-cache-dir onnxruntime rembg
+    pip install --no-cache-dir onnxruntime rembg; \
+    pip install --no-cache-dir --force-reinstall "Pillow==9.5.0" "numpy>=1.26.4,<2"
 
-RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading lama to $$XDG_CACHE_HOME (首启 8080 监听更快)..."; \
+RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading lama to $$XDG_CACHE_HOME (首启 listen 更快)..."; \
     mkdir -p /opt/iopaint-cache; \
     python -c "from iopaint.download import cli_download_model; cli_download_model('lama')"
 
-ENV PORT=8080 \
+ENV PORT=80 \
     IOPAINT_MODEL=lama \
     IOPAINT_DEVICE=cpu
-EXPOSE 8080
+EXPOSE 80
 CMD ["/entrypoint.sh"]
 
 # ---------- 2) 默认：PyPI 安装 iopaint（无离线包，云构建常用）----------
@@ -69,16 +70,17 @@ RUN set -eux; echo "[iopaint-service build] $$(date -u) installing torch+torchvi
     pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
 RUN set -eux; echo "[iopaint-service build] $$(date -u) installing Pillow + iopaint..."; \
     pip install --no-cache-dir "Pillow==9.5.0" "iopaint>=1.3.0,<2"
-# docker-entrypoint 开了 --enable-remove-bg，需 rembg + onnxruntime
+# rembg 会拉高新版 Pillow；iopaint 需 Pillow==9.5.0，装完后回锁
 RUN set -eux; echo "[iopaint-service build] $$(date -u) rembg + onnxruntime (RemoveBG)..."; \
-    pip install --no-cache-dir onnxruntime rembg
+    pip install --no-cache-dir onnxruntime rembg; \
+    pip install --no-cache-dir --force-reinstall "Pillow==9.5.0" "numpy>=1.26.4,<2"
 
-RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading lama to $$XDG_CACHE_HOME (首启 8080 监听更快)..."; \
+RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading lama to $$XDG_CACHE_HOME (首启 listen 更快)..."; \
     mkdir -p /opt/iopaint-cache; \
     python -c "from iopaint.download import cli_download_model; cli_download_model('lama')"
 
-ENV PORT=8080 \
+ENV PORT=80 \
     IOPAINT_MODEL=lama \
     IOPAINT_DEVICE=cpu
-EXPOSE 8080
+EXPOSE 80
 CMD ["/entrypoint.sh"]
