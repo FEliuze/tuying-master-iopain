@@ -6,7 +6,7 @@
 
 FROM python:3.11-slim-bookworm AS base
 
-# 模型与缓存目录；构建中预拉 lama，避免首启长时间无 8080 监听致 socat 后 502
+# 模型与缓存目录；构建中预拉 lama，减轻首启长时间无监听致 502
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
@@ -18,13 +18,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libgl1 \
     libglib2.0-0 \
-    socat \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 由 docker-entrypoint.sh 用 socat 在 PORT(默认 80) 上监听，转发到 127.0.0.1:8080 的 iopaint；缓解「探针已打 :80 而 iopaint 尚未 listen」的 connection refused。
-# 云托管里「容器端口」和 PORT 建议 80 一致；勿仅设 PORT=8080 而探针仍 80。
+# 由 docker-entrypoint.sh 直接 iopaint listen 0.0.0.0:PORT，默认 8080；与云托管「容器端口」一致即可。
 
 COPY docker-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
@@ -56,10 +54,10 @@ RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading lama to 
     mkdir -p /opt/iopaint-cache; \
     python -c "from iopaint.download import cli_download_model; cli_download_model('lama')"
 
-ENV PORT=80 \
+ENV PORT=8080 \
     IOPAINT_MODEL=lama \
     IOPAINT_DEVICE=cpu
-EXPOSE 80
+EXPOSE 8080
 CMD ["/entrypoint.sh"]
 
 # ---------- 2) 默认：PyPI 安装 iopaint（无离线包，云构建常用）----------
@@ -79,8 +77,8 @@ RUN set -eux; echo "[iopaint-service build] $$(date -u) pre-downloading lama to 
     mkdir -p /opt/iopaint-cache; \
     python -c "from iopaint.download import cli_download_model; cli_download_model('lama')"
 
-ENV PORT=80 \
+ENV PORT=8080 \
     IOPAINT_MODEL=lama \
     IOPAINT_DEVICE=cpu
-EXPOSE 80
+EXPOSE 8080
 CMD ["/entrypoint.sh"]

@@ -34,26 +34,20 @@ Dockerfile 为**多阶段**：**默认**用 PyPI 装 `iopaint`（**无需** `iop
 
 本镜像在预装 PyTorch 的底包上 `pip install iopaint`；与「纯 slim + 全量 pip 装 torch」相比，**构建阶段**明显更短。若 pip 因版本约束仍升级 torch，可在控制台**调大构建超时**，或改成本地打镜像后推送。
 
-## 部署排错：Readiness / Liveness `connection refused: dial ... :80`
+## 部署排错：Readiness / Liveness `connection refused: dial ... :8080`
 
-**原因简述**：探针在连 **:80**；若此时 **`iopain` 尚未在端口上 `listen`（首启、拉模型很慢）**，也会出现 **connection refused**，与「没配好端口」很相似。
+**原因简述**：探针在连 **`PORT`（镜像默认 8080）**；若此时 **iopaint 尚未 `listen`（首启、拉模型很慢）**，也会出现 **connection refused**。
 
-**本仓库当前做法**（`docker-entrypoint.sh` + **socat**）：
+**本仓库当前做法**：`docker-entrypoint.sh` 用 **`iopaint start --host=0.0.0.0 --port=$PORT`** 直接对外监听（默认 **8080**），与云托管「**容器端口**」设为 **8080** 一致即可。
 
-- **socat** 在 `PORT`（默认 **80**）上**尽快** `LISTEN`（K8S **TCP 探活**多为此类，容易先通过）。
-- **`iopain`** 在 **127.0.0.1:8080** 后台启动，socat 把到 **:80** 的访问**转发**到 `127.0.0.1:8080`。
-- 公网/内网 **访问根 URL 与原来一致**（仍走 **80** 进容器，无需改 `IOPAINT_BASE_URL`）。
+**若使用 HTTP/路径类探活**（如 `GET /api/v1/server-config`）：须等 **iopaint** 在 `PORT` 上就绪，必要时**拉长 initialDelay/超时**。
 
-环境变量 **PORT** 建议与控制台「**容器端口**」一致，多为 **80**。若你仍只设 `PORT=8080` 而平台固定测 **:80**，探针仍会拒连。
+**若探活仍失败**：看运行日志里 **uvicorn** 是否已报监听、**iopaint** 是否报错或 OOM。
 
-**若使用 HTTP/路径类探活**（如 GET `/`）：仍须等 **iopain** 在 8080 上就绪，必要时**拉长 initialDelay/超时**。
+## 部署排错：HTTP 502（首启拉模型或插件权重未就绪）
 
-**若仍仅 TCP 就失败**：看运行日志里 **socat** 是否 `starting`、**iopain** 是否报错或 OOM。
-
-## 部署排错：HTTP 502、日志里 `socat` connect `127.0.0.1:8080` Connection refused
-
-- **与 pip 没装完无关**；也**不等于** iopain 子进程没起来，多数情况是：**默认擦除模型（lama 等，约 196MB）在首次拉取完之前**，Uvicorn **不会**在 `127.0.0.1:8080` 上 `listen`。此时 **:80 上 socat 已就绪**（TCP 探活可能过），但转发到 8080 **无监听进程** → `Connection refused` → 网关 **502**。
-- **本仓库 Dockerfile 已在构建阶段**用 `XDG_CACHE_HOME`（固定为 `/opt/iopaint-cache`）**预拉 lama**，使容器启动后尽量**很快**在 8080 上可连、减轻长时间 502。
+- **与 pip 没装完无关**；多数情况是：**默认擦除模型（lama 等）或某插件权重在首次拉取完之前**，Uvicorn **尚未**在 **`PORT`（默认 8080）** 上 `listen`，网关侧可能 **502**。
+- **本仓库 Dockerfile 已在构建阶段**用 `XDG_CACHE_HOME`（固定为 `/opt/iopaint-cache`）**预拉 lama**，使容器启动后尽量**很快**可连、减轻长时间 502。
 - 若日志里**仍有**大体积进度条（`196M/196M` 等）且 502 持续较久：多为 **`docker-entrypoint.sh` 中开启的扩图/去背景等插件**（`--enable-realesrgan` 等）在**首启**时继续下载权重。可**等待**完成，或**按需**收紧入口脚本里的 `--enable-*` 以换首启时间（会牺牲对应能力，请与业务需求权衡）。
 - 若出现 **`ModuleNotFoundError: No module named 'rembg'`**：入口脚本启用了 **`--enable-remove-bg`**，需在镜像里 **`pip install onnxruntime rembg`**（本仓库 Dockerfile 已包含）；勿依赖 iopaint 主包自动装上全部可选依赖。
 - 云构建/运行环境需能访问**模型来源**；完全无外网时需在镜像或存储侧自备权重并保证路径与 iopain 一致。
