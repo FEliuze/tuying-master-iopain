@@ -70,3 +70,96 @@ Dockerfile 为**多阶段**：**默认**用 PyPI 装 `iopaint`（**无需** `iop
 - **运行日志 / 标准输出**：`iopaint`/uvicorn 的日志在控制台**实例/运行日志**中查看；确认无崩溃且已报告监听地址。
 - **公网自测**：本机浏览器或 `curl` 访问 `https://<服务域名>/docs`、`/api/v1/server-config`（需已开放公网并配置合法域名，或先关域名校验）。
 - **与 tuying-tools 同 VPC 时**：在 tools 里配对的 `IOPAINT_BASE_URL` 能通即表示网络可达（仍须 URL 指到 **IOPint 服务** 的根域名）。
+
+
+## 本地docker启动
+
+- docker build -t iopaint-service:local .
+- docker run --rm -p 18081:80 --name iopaint-local iopaint-service:local
+
+
+## 本地启动https加域名服务
+- cloudflared tunnel --url http://localhost:18081
+- 修改涉及iopaint-service服务域名的环境变量，包括service端和tools端
+
+## 使用预构建的 Docker 镜像
+### 先给本地镜像打标签
+命名空间：在https://console.cloud.tencent.com/tcr/namespace先新建镜像仓库，再查看命名空间，例如：tcb-100048124295-trcc
+服务名称：云托管服务列表中，对应服务的名称，例如：flask-1g8z
+docker tag iopaint-local:latest ccr.ccs.tencentyun.com/命名空间/你的服务名:latest
+
+### 推送至云端
+docker login ccr.ccs.tencentyun.com --username=你的腾讯云账号
+docker push ccr.ccs.tencentyun.com/你的命名空间/你的服务名:latest
+
+### 在微信云托管选择“镜像仓库”部署
+
+## ***最终方案***：使用 Docker Hub 等公共仓库
+
+> 思路：把 IOPaint 镜像推到 **Docker Hub 公共仓库**，再让微信云托管 / 其他平台直接 **从公网地址拉取** 部署，绕开「构建超时 / 私有仓库授权」等问题。
+
+### 一、Docker Hub 端准备
+
+```bash
+# 1) 登录 Docker Hub（首次需要；登录态存在 ~/.docker/config.json，后续 push 都用它）
+docker login
+# 按提示输入 Docker Hub 用户名 + 密码（或 Personal Access Token）。
+# 出现 "Login Succeeded" 即成功；CI/CD 环境推荐 Token。
+```
+
+在浏览器登录 Docker Hub 控制台，建一个公开仓库：
+
+1. 进入 **Repositories → Create Repository**
+2. **Repository Name**：仓库名，例如 `iopaint-service-tuying`
+3. **Visibility**：选 **Public**（公开；云托管才能不带凭据直接拉）
+4. 点击 **Create** 完成创建
+
+### 二、给本地镜像打 Tag 并推送（单架构，最简单）
+
+```bash
+# 2) 给本地镜像打一个「仓库 + 标签」式的远程名（同一个镜像可以打多个 tag）
+#    通用写法：替换成你自己的用户名 / 仓库名
+docker tag iopaint-service:local 你的用户名/你的仓库名:latest
+
+# 实际示例：把本机的 iopaint-service:local 打成 shijianchenfu/iopaint-service-tuying:latest
+docker tag iopaint-service:local shijianchenfu/iopaint-service-tuying:latest
+
+# 3) 推送到 Docker Hub，远端会出现同名 tag；后续修改本地镜像后重 tag + 重 push 即可滚动更新
+docker push 你的用户名/你的仓库名:latest
+docker push shijianchenfu/iopaint-service-tuying:latest
+```
+
+### 三、在微信云托管「从地址拉取镜像」部署
+
+- 选择「**从地址拉取镜像**」（也叫「公网镜像」）
+- 镜像地址：`docker.io/shijianchenfu/iopaint-service-tuying:latest`
+- **容器端口**：`80`（与镜像 `EXPOSE 80` / 默认 `PORT=80` 对齐，云托管才能正确做存活探针）
+
+### 四、构建跨架构镜像（推荐：用 buildx 一次推 amd64 + arm64）
+
+> 微信云托管节点多为 **linux/amd64**；本机若是 Apple Silicon（arm64），用 `docker build` 推上去的镜像在云端会因架构不一致跑不起来。用 **`buildx`** 一次构建多架构清单（manifest list），任何平台拉到的都是对应架构的镜像。
+
+```bash
+# 1) 清理掉旧的 builder（可选；首次执行可以跳过）
+docker buildx rm mybuilder
+
+# 2) 新建一个名为 mybuilder 的 buildx 实例，并切换为当前默认
+#    --driver docker-container：跑在独立容器里，支持多架构 / 跨平台构建
+docker buildx create --name mybuilder --driver docker-container --use
+
+# 3) 启动 builder 容器并打印能力清单，确认支持 linux/amd64 与 linux/arm64
+docker buildx inspect --bootstrap
+
+# 4) 进入本镜像所在目录（Dockerfile 同级）
+cd iopaint-service
+
+# 5) 一次性构建 amd64 + arm64 两个架构并直接推送到 Docker Hub
+#    --platform：声明要产出的目标架构清单
+#    -t        ：远端 tag（仓库 + 标签）
+#    --push    ：构建完成后立刻 push（多架构镜像不能 --load 到本地 docker 引擎，必须 push）(使用./docker/Dockerfile)
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t shijianchenfu/iopaint-service-tuying:latest \
+  --push .
+```
+
+完成后回到云托管，选「**从地址拉取镜像**」并使用上面同一个 `docker.io/...:latest` 地址重新发布即可；后续更新代码 → 重跑上面 `buildx build --push` → 在控制台「重新部署」拉新版本。
